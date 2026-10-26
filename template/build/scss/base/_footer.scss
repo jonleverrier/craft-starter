@@ -1,0 +1,11 @@
+/**
+ * BASE: FOOTER
+ *
+**/
+
+@use '../mixins' as *;
+@use '../theme' as *;
+
+.b-footer {
+    @include typography(p-sm);
+}

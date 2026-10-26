@@ -1,0 +1,28 @@
+{
+  "name": "{{ domain | replace('.', '-') }}",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">={{ node_version }}"
+  },
+  "scripts": {
+    "dev": "NODE_ENV=dev URL=https://{{ domain }}/ vite",
+    "build": "NODE_ENV=production URL=${URL:-https://{{ domain }}/} vite build",
+    "preview": "NODE_ENV=production URL=https://{{ domain }}/ vite preview"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "@spiriit/vite-plugin-svg-spritemap": "^5.0.0",
+    "autoprefixer": "^10.4.21",
+    "npm-check-updates": "^19.1.1",
+    "postcss-combine-duplicated-selectors": "^10.0.3",
+    "postcss-sort-media-queries": "^5.2.0",
+    "rollup-plugin-critical": "^1.0.18",
+    "sass": "^1.93.2",
+    "svgo": "^4.0.2",
+    "vite": "^7.1.11",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-restart": "^1.0.0"
+  }
+}

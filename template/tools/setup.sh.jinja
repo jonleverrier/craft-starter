@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+#
+# One-off setup for a site made from the starter. Copier runs it after creating the files.
+#
+#   bash tools/setup.sh             set up (does nothing if already set up)
+#   bash tools/setup.sh --from=N    resume from step N after a failure
+#
+# ADMIN_PASSWORD=... skips the password prompt; SKIP_LAUNCH=1 skips opening the browser.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+DOMAIN='{{ domain | replace("'", "'\\''") }}'
+ADMIN_EMAIL='{{ admin_email | replace("'", "'\\''") }}'
+ADMIN_USERNAME='{{ admin_username | replace("'", "'\\''") }}'
+STARTER_VERSION='{{ _commit | default("dev") }}'
+PLUGINS=(vite ckeditor postmark expanded-singles)
+
+FROM=1
+for arg in "$@"; do
+    case "$arg" in
+        --from=*) FROM="${arg#--from=}" ;;
+        *) echo "Unknown argument: $arg (usage: bash tools/setup.sh [--from=1-9])" >&2; exit 2 ;;
+    esac
+done
+[[ "$FROM" =~ ^[1-9]$ ]] || { echo "--from must be a step number, 1 to 9" >&2; exit 2; }
+
+# Copier runs tasks on update too, and people re-run scripts. craft/.env exists only
+# once step 2 has run, so a plain re-run stops here.
+if [ "$FROM" -eq 1 ] && [ -f craft/.env ]; then
+    echo "Already set up. To resume a failed setup: bash tools/setup.sh --from=<step>"
+    exit 0
+fi
+
+CURRENT=0
+on_error() {
+    printf '\n  Setup stopped at step %s.\n' "$CURRENT" >&2
+    printf '  Fix the problem above, then resume:  bash tools/setup.sh --from=%s\n' "$CURRENT" >&2
+    printf '  Or start over:  ddev delete -Oy %s && rm -rf "%s"\n\n' "$DOMAIN" "$PWD" >&2
+}
+trap on_error ERR
+
+step() { CURRENT="$1"; printf '\n[%s/9] %s\n' "$1" "$2"; }
+due()  { [ "$1" -ge "$FROM" ]; }
+die()  { printf '  %s\n' "$*" >&2; false; }
+
+# --- 1. Preflight (always runs) ----------------------------------------------
+step 1 "Preflight"
+for cmd in ddev docker git openssl uuidgen; do
+    command -v "$cmd" >/dev/null || die "$cmd isn't installed"
+done
+docker info >/dev/null 2>&1 || die "Docker isn't running — start it and try again"
+if [ "$FROM" -eq 1 ] && ddev describe "$DOMAIN" >/dev/null 2>&1; then
+    die "A DDEV project called $DOMAIN already exists (ddev list)"
+fi
+if [ "$FROM" -le 5 ] && [ -z "${ADMIN_PASSWORD:-}" ]; then
+    read -rsp "  Admin password for $ADMIN_USERNAME: " ADMIN_PASSWORD </dev/tty; echo
+    read -rsp "  Same again: " again </dev/tty; echo
+    [ "$ADMIN_PASSWORD" = "$again" ] || die "The passwords don't match"
+fi
+if [ "$FROM" -le 5 ]; then
+    # Length via wc: the usual bash form opens a Jinja comment in this template.
+    [ "$(printf '%s' "$ADMIN_PASSWORD" | wc -c | tr -d ' ')" -ge 6 ] || die "Craft needs a password of at least 6 characters"
+fi
+echo "  ok"
+
+# --- 2. craft/.env -------------------------------------------------------------
+if due 2; then
+    step 2 "Writing craft/.env"
+    if [ -f craft/.env ]; then
+        echo "  exists, leaving it alone"
+    else
+        cp craft/.env.example craft/.env
+        KEY="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+        APP_ID="CraftCMS--$(uuidgen | tr '[:upper:]' '[:lower:]')"
+        sed -i '' \
+            -e "s|^CRAFT_SECURITY_KEY=.*|CRAFT_SECURITY_KEY=$KEY|" \
+            -e "s|^CRAFT_APP_ID=.*|CRAFT_APP_ID=$APP_ID|" \
+            craft/.env
+        echo "  ok"
+    fi
+fi
+
+# --- 3. DDEV -------------------------------------------------------------------
+if due 3; then
+    step 3 "Starting DDEV (the first run builds the AVIF and Chromium images)"
+    ddev start
+fi
+
+# --- 4. Composer ----------------------------------------------------------------
+if due 4; then
+    step 4 "Installing PHP packages"
+    # No scripts: they run Craft commands, and Craft isn't installed yet.
+    ddev composer install --no-scripts --no-interaction
+fi
+
+# --- 5. Craft --------------------------------------------------------------------
+if due 5; then
+    step 5 "Installing Craft"
+    if ddev craft install/check >/dev/null 2>&1; then
+        echo "  already installed"
+    else
+        # Literal $VARs: Craft stores the env var names, so the URL and name stay in .env.
+        ddev craft install --interactive=0 \
+            --email="$ADMIN_EMAIL" \
+            --username="$ADMIN_USERNAME" \
+            --password="$ADMIN_PASSWORD" \
+            --site-name='$PRIMARY_SITE_NAME' \
+            --site-url='$PRIMARY_SITE_URL' \
+            --language=en-GB
+    fi
+    ddev craft frontend/setup/home
+    ddev craft frontend/setup/assets
+fi
+
+# --- 6. Plugins ------------------------------------------------------------------
+if due 6; then
+    step 6 "Installing plugins"
+    for handle in "${PLUGINS[@]}"; do
+        ddev craft plugin/install "$handle" --interactive=0
+    done
+fi
+
+# --- 7. Frontend -----------------------------------------------------------------
+if due 7; then
+    step 7 "Installing npm packages and building (critical CSS crawls the live site)"
+    ddev npm install --no-audit --no-fund
+    ddev npm run build
+fi
+
+# --- 8. Git ----------------------------------------------------------------------
+if due 8; then
+    step 8 "First commit"
+    [ -d .git ] || git init -q -b main
+    git add -A
+    if git diff --cached --quiet; then
+        echo "  nothing new to commit"
+    else
+        git commit -qm "Initial commit from starter $STARTER_VERSION"
+        echo "  ok"
+    fi
+fi
+
+# --- 9. Done ---------------------------------------------------------------------
+step 9 "Done"
+[ "${SKIP_LAUNCH:-}" = 1 ] || ddev launch
+cat <<DONE
+
+  Site:     https://$DOMAIN
+  CP:       https://$DOMAIN/manager  ($ADMIN_USERNAME)
+  Dev:      ddev npm run dev
+  Build:    ddev npm run build
+  Update:   copier update   (with a clean git tree)
+
+DONE

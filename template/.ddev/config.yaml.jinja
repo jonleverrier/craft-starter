@@ -1,0 +1,24 @@
+name: {{ domain }}
+type: craftcms
+docroot: public
+php_version: "{{ php_version }}"
+webserver_type: nginx-fpm
+xdebug_enabled: false
+additional_hostnames: []
+additional_fqdns:
+    - {{ domain }}
+database:
+    type: mysql
+    version: "{{ mysql_version }}"
+use_dns_when_possible: true
+composer_root: craft
+composer_version: "{{ composer_version }}"
+nodejs_version: "{{ node_version }}"
+corepack_enable: false
+# tools/setup.sh writes craft/.env itself; DDEV must not create or edit it.
+disable_settings_management: true
+web_environment:
+    # Debian chromium from .ddev/web-build/Dockerfile.chromium, for rollup-plugin-critical.
+    # Puppeteer's own download is x86-64 only and won't run on Apple Silicon.
+    - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    - PUPPETEER_SKIP_DOWNLOAD=true

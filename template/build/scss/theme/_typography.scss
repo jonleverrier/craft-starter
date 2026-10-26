@@ -1,0 +1,26 @@
+/**
+ * THEME: TYPOGRAPHY
+ *
+**/
+
+@use '../theme' as *;
+@use '../mixins' as *;
+
+html {
+    // 1rem = 10px. https://www.aleksandrhovhannisyan.com/blog/62-5-percent-font-size-trick/
+    font-size: 62.5%;
+}
+
+body {
+    font-size: 1.6rem;
+    font-family: $g-font-primary;
+    line-height: 1.5;
+    color: getmap($colour, primary, 700);
+    background: getmap($colour, light, 100);
+}
+
+h1 { @include typography(h1); }
+h2 { @include typography(h2); }
+h3 { @include typography(h3); }
+h4 { @include typography(h4); }
+p, .u-font-p { @include typography(p); }

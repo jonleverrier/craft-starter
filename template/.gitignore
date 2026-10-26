@@ -1,0 +1,28 @@
+.DS_Store
+/.idea
+node_modules
+
+# Craft
+/craft/vendor
+/craft/.env
+/craft/storage/*
+!/craft/storage/.gitkeep
+
+# Built and generated — Vite and Craft rebuild these
+/public/dist/*
+/public/cpresources/*
+!/public/cpresources/.gitkeep
+/build/scss/templates/_sprite.scss
+
+# Uploaded assets are content, not code
+/public/assets
+
+# Local DB backups (tools/sync)
+/.backups
+
+# DDEV — machine-specific
+/.ddev/.env.web
+/.ddev/traefik/
+
+# Claude worktrees
+/.claude/worktrees/

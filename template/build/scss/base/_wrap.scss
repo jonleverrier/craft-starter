@@ -1,0 +1,22 @@
+/**
+ * BASE: WRAP
+ *
+**/
+
+@use '../mixins' as *;
+@use '../theme' as *;
+
+// The page box: padded, capped at the design canvas, centred past it.
+.b-wrap {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    max-width: getmap($mq-breakpoints, xxl);
+    margin-inline: auto;
+    padding: getmap($space, rhythm, 500);
+    gap: getmap($space, rhythm, 700);
+
+    @include mq(from, md) {
+        padding: getmap($space, rhythm, 600);
+    }
+}

@@ -1,0 +1,86 @@
+# The starter's questions and EVERY version pin. Bump a version here, run bin/smoke,
+# commit, tag. New sites get it; existing sites get it with `copier update`.
+
+_min_copier_version: "9.5.0"
+_subdirectory: template
+_templates_suffix: .jinja
+_answers_file: .copier-answers.yml
+
+# Owned by the project from the moment it's created; `copier update` never touches them.
+_skip_if_exists:
+    - craft/config/project/**
+    - craft/templates/_views/single/home/default.twig
+    - build/scss/theme/_setup.scss
+
+# `|| true`: Copier deletes the new folder when a task fails, which would take the
+# half-built site with it. setup.sh prints its own error and the --from=N to resume.
+_tasks:
+    - command: bash tools/setup.sh || true
+      when: "{{ _copier_operation == 'copy' }}"
+
+# --- Questions ---------------------------------------------------------------
+
+site_name:
+    type: str
+    help: Site name (control panel and page titles)
+    validator: "{% if not site_name.strip() %}Required{% endif %}"
+
+domain:
+    type: str
+    help: Local domain, e.g. myidea.local
+    # Allowlist: it becomes a DDEV name, a URL and a bash string. Labels of a-z, 0-9 and
+    # hyphens (not at either end), joined by single dots, at least two of them.
+    validator: >-
+        {%- set ns = namespace(bad=false) -%}
+        {%- for c in domain -%}{%- if c not in 'abcdefghijklmnopqrstuvwxyz0123456789.-' -%}{%- set ns.bad = true -%}{%- endif -%}{%- endfor -%}
+        {%- for label in domain.split('.') -%}{%- if not label or label.startswith('-') or label.endswith('-') -%}{%- set ns.bad = true -%}{%- endif -%}{%- endfor -%}
+        {%- if ns.bad or '.' not in domain -%}Lowercase letters, digits and hyphens, separated by dots, e.g. myidea.local{%- endif -%}
+
+admin_email:
+    type: str
+    help: Admin email
+    validator: "{% if '@' not in admin_email %}Needs an @{% endif %}"
+
+admin_username:
+    type: str
+    help: Admin username
+    default: admin
+
+# --- Version pins (not asked) ------------------------------------------------
+
+php_version:
+    type: str
+    default: "8.4"
+    when: false
+mysql_version:
+    type: str
+    default: "8.4"
+    when: false
+node_version:
+    type: str
+    default: "22"
+    when: false
+composer_version:
+    type: str
+    default: "2"
+    when: false
+craft_version:
+    type: str
+    default: "^5.11"
+    when: false
+vite_plugin_version:
+    type: str
+    default: "^5.0"
+    when: false
+ckeditor_version:
+    type: str
+    default: "^5.7"
+    when: false
+postmark_version:
+    type: str
+    default: "^3.1"
+    when: false
+expanded_singles_version:
+    type: str
+    default: "^3.0"
+    when: false

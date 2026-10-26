@@ -1,0 +1,19 @@
+/**
+ * BASE: HEADER
+ *
+**/
+
+@use '../mixins' as *;
+@use '../theme' as *;
+
+.b-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.b-header__home {
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+}

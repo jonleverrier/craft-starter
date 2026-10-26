@@ -1,0 +1,89 @@
+/**
+ * THEME: SETUP
+ *
+ * The site's design tokens. Owned by the project: `copier update` never overwrites it.
+ *
+**/
+
+@use '../mixins/rem' as *;
+
+// @spiriit/vite-plugin-svg-spritemap: set via vite.config.js
+$sprite-type: 'uri' !default;
+
+$g-font-primary: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+$g-font-secondary: ui-monospace, "SF Mono", "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+
+$b-radius-100: 0.5rem;
+$b-radius-200: 1.25rem;
+$b-radius-300: 2.5rem;
+
+// SPACING
+$space: (
+	rhythm: (
+		100: 0.313rem,
+		200: 0.563rem,
+		300: 0.875rem,
+		400: 1.125rem,
+		500: 1.688rem,
+		600: 2.313rem,
+		700: 3.438rem,
+		800: 4.563rem,
+		900: 6.875rem
+	)
+);
+
+// Z-INDEX
+$z-index: (
+	xxl:	9000,
+	xl: 	3000,
+	lg: 	2000,
+	md: 	1000,
+	sm: 	1
+);
+
+// BREAKPOINTS — also the critical CSS capture widths in vite.config.js.
+$mq-breakpoints: (
+    sm:     35em,    // 560
+    md:     48em,    // 768
+    lg:     64em,    // 1024
+    xl:     80em,    // 1280
+    xxl:    108em,   // 1728 — the design canvas
+);
+
+// COLOUR
+$colour: (
+	primary: (
+		700: #111,
+	),
+	light: (
+		100: #fff,
+	),
+);
+
+// TYPOGRAPHY — px through rem() (the root is 62.5%, so 1rem = 10px).
+$typography: (
+    h1: (
+        base: ( font-size: clamp(#{rem(31)}, 9vw, #{rem(44)}), line-height: 1.1 ),
+        md:   ( font-size: rem(56) ),
+        lg:   ( font-size: rem(72) ),
+    ),
+    h2: (
+        base: ( font-size: clamp(#{rem(26)}, 7.5vw, #{rem(37)}), line-height: 1.15 ),
+        md:   ( font-size: rem(44) ),
+    ),
+    h3: (
+        base: ( font-size: rem(24), line-height: 1.2 ),
+        md:   ( font-size: rem(30) ),
+    ),
+    h4: (
+        base: ( font-size: rem(20), line-height: 1.25 ),
+        md:   ( font-size: rem(24) ),
+    ),
+    p: (
+        base: ( font-size: rem(17), line-height: 1.5 ),
+        md:   ( font-size: rem(19) ),
+    ),
+    p-sm: (
+        base: ( font-size: rem(15), line-height: 1.45 ),
+    ),
+);

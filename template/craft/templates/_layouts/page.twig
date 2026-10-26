@@ -1,0 +1,22 @@
+{% set element = entry ?? category ?? element ?? null %}
+<!DOCTYPE html>
+<html lang="{{ craft.app.language|slice(0,2) }}" class="no-js is-loading">
+<head>
+    {% include '_includes/page/head.twig' %}
+    {% block siteHead %}{% endblock %}
+    {{ head() }}
+</head>
+<body{% if bodyClass ?? false %} class="{{ bodyClass }}"{% endif %}>
+    <a class="b-skip" href="#main">Skip to main content</a>
+    <div class="b-wrap">
+        {% include '_includes/page/header.twig' %}
+        <main class="b-main" id="main" tabindex="-1">
+            {% block siteContent %}{% endblock %}
+        </main>
+        {% include '_includes/page/footer.twig' %}
+    </div>
+    {% include '_includes/page/scripts.twig' %}
+    {% block siteScripts %}{% endblock %}
+    {{ endBody() }}
+</body>
+</html>

@@ -1,0 +1,38 @@
+/**
+ * BASE: MAIN
+ *
+**/
+
+@use '../mixins' as *;
+@use '../theme' as *;
+
+// Skip link: hidden until focused, then a button in the top-left corner.
+// Clipped rather than moved off-screen, so overscroll can't reveal it.
+.b-skip {
+    position: fixed;
+    top: rem(12);
+    left: rem(12);
+    z-index: getmap($z-index, xxl);
+    padding: rem(10) rem(16);
+    border-radius: $b-radius-100;
+    background: getmap($colour, primary, 700);
+    color: getmap($colour, light, 100);
+    font-weight: 600;
+    text-decoration: none;
+    clip-path: inset(50%);
+
+    &:focus {
+        clip-path: none;
+        outline: rem(2) solid getmap($colour, primary, 700);
+        outline-offset: rem(2);
+    }
+}
+
+.b-main {
+    flex: 1;
+
+    // The skip link's target: focusable, but no ring round the whole page.
+    &:focus {
+        outline: none;
+    }
+}

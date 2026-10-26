@@ -1,0 +1,19 @@
+{#
+  Every error page. Craft looks for _views/<status code>, then _views/error
+  (errorTemplatePrefix in config/general.php).
+#}
+{% extends '_layouts/page.twig' %}
+
+{% set tplPath = _self %}
+
+{% set titles = {
+    404: 'Page not found',
+    503: 'Back soon',
+} %}
+{% set title = titles[statusCode] ?? 'Something went wrong' %}
+{% set pageTitleParts = [title] %}
+
+{% block siteContent %}
+    <h1>{{ title }}</h1>
+    <p><a href="{{ siteUrl }}">Back to the home page</a></p>
+{% endblock %}

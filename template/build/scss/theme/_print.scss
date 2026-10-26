@@ -1,0 +1,21 @@
+/**
+ * THEME: PRINT
+ *
+**/
+
+@media print {
+    .b-skip,
+    .b-header,
+    .b-footer {
+        display: none;
+    }
+
+    body {
+        color: #000;
+        background: #fff;
+    }
+
+    a[href^="http"]::after {
+        content: " (" attr(href) ")";
+    }
+}

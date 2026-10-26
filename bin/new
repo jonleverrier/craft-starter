@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Makes a new site beside the starter, in a folder named after its domain:
+#
+#   cd ~/Sites/starter
+#   bin/new myidea.local        →  ~/Sites/myidea.local
+#   bin/new                     (asks for the domain)
+#
+# Copier then asks the remaining questions and runs the setup. Anything after the
+# domain goes to copier as-is. SITES_DIR=/elsewhere overrides the parent folder.
+
+set -euo pipefail
+
+STARTER="$(cd "$(dirname "$0")/.." && pwd)"
+SITES_DIR="${SITES_DIR:-$(dirname "$STARTER")}"
+
+# Where `pip install --user copier` puts it, in case it isn't on PATH.
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"
+command -v copier >/dev/null || { echo "Copier isn't installed: python3 -m pip install --user copier" >&2; exit 1; }
+
+domain="${1:-}"
+if [ -n "$domain" ]; then
+    shift
+else
+    read -rp "Domain (e.g. myidea.local): " domain
+fi
+[ -n "$domain" ] || { echo "A domain is needed, e.g. bin/new myidea.local" >&2; exit 2; }
+
+dest="$SITES_DIR/$domain"
+[ ! -e "$dest" ] || { echo "$dest already exists" >&2; exit 1; }
+
+# HEAD: the starter's latest commit. Copier checks the domain before writing anything.
+exec copier copy --trust --vcs-ref HEAD --data "domain=$domain" "$@" "$STARTER" "$dest"

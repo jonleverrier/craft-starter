@@ -1,0 +1,75 @@
+/**
+ * BASE: RESET
+ *
+ * inspired from:
+ * https://github.com/hankchizljaw/modern-css-reset/blob/master/dist/reset.css
+**/
+
+@use '../mixins' as *;
+@use '../theme' as *;
+
+html,
+body {
+    height: 100%;
+}
+
+// macOS renders both faces heavier than they were drawn; set once here, never per
+// component.
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    // Reserve the scrollbar's gutter, so locking scroll (overflow: hidden) never
+    // widens the viewport and tips a media query over a breakpoint.
+    scrollbar-gutter: stable;
+}
+
+// Box sizing
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+// Remove unwanted padding
+ul,
+ol {
+    padding: 0;
+}
+
+// Remove unwanted margin
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+p,
+ul,
+ol,
+figure,
+blockquote,
+dl,
+dd,
+pre {
+    margin: 0;
+}
+
+// Body defaults
+body {
+    position: relative;
+}
+
+// Remove all animations and transitions for people that prefer not to see them 
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *:hover,
+    *:before,
+    *:after {
+      transition-property: none !important;
+    }
+}
+
+.is-loading * {
+    transition-property: none !important;
+}
+

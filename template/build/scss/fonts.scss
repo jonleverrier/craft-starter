@@ -1,0 +1,26 @@
+/**
+ * FONTS
+ *
+ * Every @font-face on the site, as its own Vite entry, inlined in the head of every
+ * page (_includes/page/head.twig) and nowhere else. Declared once, a face is fetched
+ * once — a second declaration makes the page switch to an unloaded copy and flash
+ * the fallback.
+ *
+ * Add a face: put the files in build/fonts/, then
+ *
+ *   @font-face {
+ *       font-family: 'Brand';
+ *       src: url('@fonts/Brand-Regular.woff2') format('woff2');
+ *       font-display: swap;
+ *       font-style: normal;
+ *       font-weight: 400;
+ *   }
+ *
+ * and put 'Brand' at the front of $g-font-primary in theme/_setup.scss.
+**/
+
+// Keeps this entry non-empty before a face is added: Vite leaves an empty CSS entry
+// out of the manifest, and the head would have nothing to inline.
+:root {
+    --fonts: 1;
+}

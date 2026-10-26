@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Deletes a site made by bin/new: its DDEV project (containers, database, the
+# /etc/hosts entry) and its folder. Cannot be undone.
+#
+#   cd ~/Sites/starter
+#   bin/remove myidea.local     →  deletes ~/Sites/myidea.local
+#
+# Asks you to type the domain again first. Only removes folders made from this
+# starter. SITES_DIR=/elsewhere overrides the parent folder, as for bin/new.
+
+set -euo pipefail
+
+STARTER="$(cd "$(dirname "$0")/.." && pwd)"
+SITES_DIR="${SITES_DIR:-$(dirname "$STARTER")}"
+
+domain="${1:-}"
+[ -n "$domain" ] || { echo "Which site? e.g. bin/remove myidea.local" >&2; exit 2; }
+case "$domain" in */*|.|..) echo "Give the domain, not a path: bin/remove myidea.local" >&2; exit 2 ;; esac
+
+dest="$SITES_DIR/$domain"
+[ -d "$dest" ] || { echo "$dest doesn't exist" >&2; exit 1; }
+[ "$(cd "$dest" && pwd)" != "$STARTER" ] || { echo "That's the starter itself" >&2; exit 1; }
+
+# Only sites from this starter: the answers file names it as the source.
+answers="$dest/.copier-answers.yml"
+[ -f "$answers" ] && grep -qxF "_src_path: $STARTER" "$answers" \
+    || { echo "$dest wasn't made from this starter, leaving it alone" >&2; exit 1; }
+
+echo "This deletes, for good:"
+echo "  - the DDEV project $domain (containers and database, no snapshot)"
+echo "  - the folder $dest"
+if [ -d "$dest/.git" ]; then
+    if [ -n "$(git -C "$dest" status --porcelain)" ]; then
+        echo "  - including uncommitted changes"
+    fi
+    if [ -z "$(git -C "$dest" remote)" ]; then
+        echo "  - including its git history (it has no remote)"
+    fi
+fi
+read -rp "Type the domain to confirm: " typed
+[ "$typed" = "$domain" ] || { echo "Didn't match, nothing deleted." >&2; exit 1; }
+
+if command -v ddev >/dev/null && ddev describe "$domain" >/dev/null 2>&1; then
+    # Removes the /etc/hosts entry too, which can ask for your Mac password.
+    ddev delete --omit-snapshot --yes "$domain"
+else
+    echo "No DDEV project called $domain, skipping."
+fi
+
+rm -rf "$dest"
+echo "Removed $domain."

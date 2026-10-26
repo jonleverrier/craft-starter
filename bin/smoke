@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+#
+# Checks the starter.
+#
+#   bin/smoke                 make a real site, check it end to end, delete it (5–10 min)
+#   bin/smoke --render-only   render the template without running setup (seconds)
+#
+# Run the full check before tagging a release.
+
+set -euo pipefail
+
+STARTER="$(cd "$(dirname "$0")/.." && pwd)"
+# A ddev.site domain resolves through public DNS, so no sudo prompt for /etc/hosts.
+DOMAIN="starter-smoke.ddev.site"
+# Quotes, an apostrophe and a $ on purpose: the name passes through bash, .env and Twig.
+SITE_NAME="Smoke \"Test\" Jon's \$hop"
+ANSWERS=(
+    --data "site_name=$SITE_NAME"
+    --data "domain=$DOMAIN"
+    --data "admin_email=smoke@example.com"
+    --data "admin_username=admin"
+)
+
+fail() { printf '  FAIL: %s\n' "$*" >&2; exit 1; }
+ok()   { printf '  ok: %s\n' "$*"; }
+
+# Where `pip install --user copier` puts it, in case it isn't on PATH.
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"
+command -v copier >/dev/null || fail "Copier isn't installed: python3 -m pip install --user copier"
+
+render() { # render DEST [extra copier args...]
+    local dest="$1"; shift
+    copier copy --quiet --defaults --trust --skip-tasks --vcs-ref HEAD \
+        "${ANSWERS[@]}" "$@" "$STARTER" "$dest"
+}
+
+render_only() {
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' EXIT
+    local out="$tmp/site"
+
+    render "$out"
+    ok "rendered"
+
+    # Every .jinja file rendered, with nothing left unrendered.
+    while read -r f; do
+        local target="$out/${f%.jinja}"
+        [ -f "$target" ] || fail "missing ${f%.jinja}"
+        if grep -nE '\{\{|\{%' "$target"; then fail "unrendered placeholder in ${f%.jinja}"; fi
+    done < <(cd "$STARTER/template" && find . -name '*.jinja' -not -name '{{*')
+    ok "all .jinja files rendered"
+
+    ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$out/.ddev/config.yaml" || fail ".ddev/config.yaml is not valid YAML"
+    grep -q "^name: $DOMAIN$" "$out/.ddev/config.yaml" || fail "ddev name not set"
+    grep -q 'php_version: "8.4"' "$out/.ddev/config.yaml" || fail "php_version not set"
+    for j in package.json craft/composer.json; do
+        [ -f "$out/$j" ] || continue
+        node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$out/$j" || fail "$j is not valid JSON"
+    done
+    ok "config files parse"
+
+    [ "$(cat "$out/.nvmrc")" = "22" ] || fail ".nvmrc should be 22"
+    [ -f "$out/.copier-answers.yml" ] || fail "no .copier-answers.yml (copier update needs it)"
+    ! grep -qi password "$out/.copier-answers.yml" || fail "answers file mentions a password"
+    ok "answers file clean"
+
+    for bad in MyIdea.local myidea "my idea.local" "x'y.local" 'a$(id).local' a..b.local -a.local a-.local a.local:8080 é.local 'a.b;c'; do
+        if copier copy --quiet --defaults --trust --skip-tasks --vcs-ref HEAD \
+            --data "site_name=x" --data "domain=$bad" --data "admin_email=a@b.c" \
+            "$STARTER" "$tmp/bad" >/dev/null 2>&1; then
+            fail "domain '$bad' was accepted"
+        fi
+        rm -rf "$tmp/bad"
+    done
+    ok "invalid domains rejected"
+
+    render_only_extra "$out"
+}
+
+render_only_extra() {
+    local out="$1"
+
+    # PHP syntax, through Docker since the host has no PHP.
+    local php_files
+    php_files="$(cd "$out" && find craft public -name '*.php' -not -path '*/vendor/*' 2>/dev/null | sort || true)"
+    [ -n "$php_files" ] || fail "no PHP files rendered"
+    docker run --rm -v "$out:/app" -w /app php:8.4-cli \
+        sh -c 'for f in "$@"; do php -l "$f" >/dev/null || exit 1; done' _ $php_files \
+        || fail "PHP syntax error"
+    ok "PHP lints"
+
+    # The site name must survive .env's quoting exactly. Parsed with phpdotenv in an
+    # empty dir, so Composer doesn't try to resolve all of Craft.
+    local parsed
+    parsed="$(docker run --rm -v "$out/craft/.env.example:/env/.env.example:ro" -w /tmp composer:2 sh -c \
+        'composer require -q --no-interaction vlucas/phpdotenv:^5.4 >/dev/null 2>&1 &&
+         php -r "require \"vendor/autoload.php\"; \$e = Dotenv\Dotenv::parse(file_get_contents(\"/env/.env.example\")); echo \$e[\"PRIMARY_SITE_NAME\"];" 2>&1' || true)"
+    [ "$parsed" = "$SITE_NAME" ] || fail "PRIMARY_SITE_NAME parsed as [$parsed], wanted [$SITE_NAME]"
+    ok ".env keeps the site name intact"
+
+    for t in _layouts/page _includes/page/head _includes/page/header _includes/page/footer \
+             _includes/page/scripts _routers/single _routers/channel _routers/structure \
+             _routers/entry _views/single/home/default _views/error; do
+        [ -f "$out/craft/templates/$t.twig" ] || fail "missing template $t.twig"
+    done
+    # Twig must arrive untouched: Copier only renders .jinja files.
+    grep -q '{{ head() }}' "$out/craft/templates/_layouts/page.twig" || fail "Twig was rendered by Copier"
+    ok "templates present and untouched"
+
+    # Build the CSS and JS without DDEV (critical CSS skipped: it needs a running site).
+    (cd "$out" && npm install --silent --no-audit --no-fund >/dev/null \
+        && SKIP_CRITICAL=1 URL=https://$DOMAIN/ npx vite build --logLevel error) \
+        || fail "vite build failed"
+    [ -f "$out/public/dist/manifest.json" ] || fail "no manifest.json"
+    node -e '
+        const m = require(process.argv[1]);
+        for (const k of ["build/js/app.js", "build/scss/fonts.scss"]) if (!m[k]) { console.error("manifest missing " + k); process.exit(1); }
+    ' "$out/public/dist/manifest.json" || fail "manifest is missing an entry"
+    ok "vite builds (without critical CSS)"
+
+    bash -n "$out/tools/setup.sh" || fail "tools/setup.sh has a syntax error"
+    ok "setup.sh parses"
+
+    for s in _common sync_assets_from_local_to_prod sync_assets_from_prod_to_local \
+             sync_db_from_local_to_prod sync_db_from_prod_to_local; do
+        [ -f "$out/tools/sync/$s.sh" ] || fail "missing tools/sync/$s.sh"
+        bash -n "$out/tools/sync/$s.sh" || fail "tools/sync/$s.sh has a syntax error"
+    done
+    if grep -rniE 'jonson|vip' "$out/tools/sync"; then fail "site-specific code left in tools/sync"; fi
+    cp "$out/craft/.env.example" "$out/craft/.env"
+    local msg
+    msg="$(bash "$out/tools/sync/sync_db_from_prod_to_local.sh" 2>&1 || true)"
+    rm "$out/craft/.env"
+    grep -q 'PRODUCTION_SSH_USER / _HOST / _PATH must all be set' <<<"$msg" \
+        || fail "sync without a server should explain what's missing, got: $msg"
+    ok "sync tools parse, are generic, and explain a missing server"
+
+    # A failed setup must leave the folder in place, or `--from` has nothing to resume.
+    # Stub ddev (start fails) and docker on PATH; Copier deletes the folder on a failed task.
+    mkdir -p "$tmp/stubs"
+    printf '#!/bin/sh\nexit 1\n' > "$tmp/stubs/ddev"
+    printf '#!/bin/sh\nexit 0\n' > "$tmp/stubs/docker"
+    chmod +x "$tmp/stubs/ddev" "$tmp/stubs/docker"
+    local failed_out
+    failed_out="$(PATH="$tmp/stubs:$PATH" ADMIN_PASSWORD=secret-pw SKIP_LAUNCH=1 \
+        copier copy --quiet --defaults --trust --vcs-ref HEAD "${ANSWERS[@]}" \
+        "$STARTER" "$tmp/failing" 2>&1 || true)"
+    [ -d "$tmp/failing" ] || fail "a failed setup deleted the project folder"
+    grep -q -- '--from=3' <<<"$failed_out" || fail "a failed setup didn't offer --from=3: $failed_out"
+    ok "failed setup keeps the folder and offers a resume"
+
+    # bin/new: makes the site in SITES_DIR (default: the folder the starter sits in),
+    # named after the domain, and refuses a folder that already exists.
+    mkdir -p "$tmp/sites/taken.local"
+    local taken
+    taken="$(SITES_DIR="$tmp/sites" "$STARTER/bin/new" taken.local 2>&1 || true)"
+    grep -q 'already exists' <<<"$taken" || fail "bin/new didn't refuse an existing folder: $taken"
+    SITES_DIR="$tmp/sites" "$STARTER/bin/new" new-site.local --quiet --defaults --skip-tasks \
+        --data "site_name=x" --data "admin_email=a@b.c" >/dev/null 2>&1 || fail "bin/new failed"
+    grep -q '^name: new-site.local$' "$tmp/sites/new-site.local/.ddev/config.yaml" 2>/dev/null \
+        || fail "bin/new didn't create sites/new-site.local"
+    ok "bin/new creates the site beside the starter"
+}
+
+full() {
+    # Global, not local: the EXIT trap runs after full() has returned.
+    dir="$HOME/Sites/$DOMAIN"
+    [ ! -e "$dir" ] || fail "$dir already exists — remove it (and ddev delete -Oy $DOMAIN) first"
+
+    cleanup() {
+        ddev delete -Oy "$DOMAIN" >/dev/null 2>&1 || true
+        rm -rf "$dir"
+        [ ! -e "$dir" ] || echo "  WARNING: couldn't remove $dir" >&2
+    }
+    trap cleanup EXIT
+
+    echo "Creating ${DOMAIN}…"
+    ADMIN_PASSWORD='smoke-test-password' SKIP_LAUNCH=1 \
+        copier copy --defaults --trust --vcs-ref HEAD "${ANSWERS[@]}" "$STARTER" "$dir"
+    cd "$dir"
+    ok "setup finished"
+
+    # --resolve: no reliance on the /etc/hosts entry DDEV may or may not have been allowed to add.
+    local url="https://$DOMAIN"
+    get() { curl -sk --resolve "$DOMAIN:443:127.0.0.1" "$@"; }
+    local code
+    code="$(get -o /dev/null -w '%{http_code}' "$url/")"
+    [ "$code" = 200 ] || fail "/ returned $code"
+    # Twig escapes the name: this proves .env → $PRIMARY_SITE_NAME → <title> kept every character.
+    # Captured first: with pipefail, `curl | grep -q` fails when grep quits early and curl gets SIGPIPE.
+    local page
+    page="$(get "$url/")"
+    grep -qF '<title>Smoke &quot;Test&quot; Jon&#039;s $hop</title>' <<<"$page" \
+        || fail "home <title> doesn't carry the site name: $(grep -o '<title>.*</title>' <<<"$page")"
+    ok "home page renders with the site name"
+
+    code="$(get -o /dev/null -w '%{http_code}' "$url/manager")"
+    [[ "$code" =~ ^(200|302)$ ]] || fail "/manager returned $code"
+    code="$(get -o /dev/null -w '%{http_code}' "$url/__smoke-404")"
+    [ "$code" = 404 ] || fail "missing page returned $code"
+    page="$(get "$url/__smoke-404")"
+    grep -q 'Page not found' <<<"$page" || fail "404 page doesn't use _views/error"
+    ok "control panel and 404"
+
+    [ -f public/dist/manifest.json ] || fail "no manifest.json"
+    [ -s public/dist/criticalcss/_views/single/home/default_critical.min.css ] || fail "no critical CSS for home"
+    [ -s public/dist/criticalcss/_views/error_critical.min.css ] || fail "no critical CSS for the error view"
+    ok "assets and critical CSS built"
+
+    # Bytes 4–11 of a real AVIF are "ftypavif"; a missing encoder throws or writes something else.
+    local magic
+    magic="$(ddev exec "php -r '\$i = new Imagick(); \$i->newImage(8, 8, new ImagickPixel(\"red\")); \$i->setImageFormat(\"avif\"); echo substr(\$i->getImageBlob(), 4, 8);'" 2>&1 || true)"
+    [ "$magic" = "ftypavif" ] || fail "AVIF encode produced: $magic"
+    ok "AVIF encodes for real"
+
+    grep -rqF '$PRIMARY_SITE_URL' craft/config/project/ || fail "project config doesn't use \$PRIMARY_SITE_URL"
+    grep -rqF '$PRIMARY_SITE_NAME' craft/config/project/ || fail "project config doesn't use \$PRIMARY_SITE_NAME"
+    grep -rq "handle: home" craft/config/project/sections/ || fail "no Home section in project config"
+    grep -qF '$PRIMARY_SITE_FILESYSTEM_WEBROOT' craft/config/project/project.yaml || fail "no Local filesystem in project config"
+    grep -rq "handle: local" craft/config/project/volumes/ || fail "no Local volume in project config"
+    ok "project config is env-driven and has Home and the Local volume"
+
+    [ "$(git rev-list --count HEAD)" = 1 ] || fail "expected exactly one commit"
+    [ -z "$(git status --porcelain)" ] || fail "working tree not clean after setup: $(git status --porcelain)"
+    ! grep -qi password .copier-answers.yml || fail "answers file mentions a password"
+    ok "one clean commit, no password on disk"
+
+    # Re-running on a set-up project is a no-op.
+    grep -q 'Already set up' <<<"$(bash tools/setup.sh)" || fail "re-run didn't detect an existing setup"
+    ok "re-run is a no-op"
+
+    # Resuming late re-runs the build and adds no commit.
+    SKIP_LAUNCH=1 bash tools/setup.sh --from=7 >/dev/null || fail "--from=7 failed"
+    [ "$(git rev-list --count HEAD)" = 1 ] || fail "--from=7 added a commit"
+    ok "resume from step 7"
+
+    # A bad --from is refused.
+    local rc=0
+    bash tools/setup.sh --from=x >/dev/null 2>&1 || rc=$?
+    [ "$rc" = 2 ] || fail "--from=x exited $rc, wanted 2"
+    ok "bad --from refused"
+
+    echo "All checks passed."
+}
+
+case "${1:-}" in
+    --render-only) render_only ;;
+    "") full ;;
+    *) echo "usage: bin/smoke [--render-only]" >&2; exit 2 ;;
+esac

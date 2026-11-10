@@ -44,6 +44,45 @@ bash tools/setup.sh --from=<step>
 To create a site somewhere else: `SITES_DIR=~/Projects bin/new myidea.local`, or call
 Copier directly: `copier copy --trust ~/Sites/starter <any/path>`.
 
+## Craft 6 (beta)
+
+Craft 6 lives on the `craft6` branch; `main` stays on Craft 5. To make a Craft 6 site:
+
+```bash
+cd ~/Sites/starter
+bin/new --craft6 myidea.local
+```
+
+It works from a `main` checkout: `--craft6` builds from the `craft6` branch's latest
+commit. Everything else (questions, setup steps, `--from`) is the same. Update a Craft 6
+site from its own branch, or `copier update` moves it back to Craft 5:
+
+```bash
+copier update --trust --vcs-ref=craft6
+```
+
+What's different on Craft 6 (6.0.0-beta.1), and why:
+
+| | Craft 5 (`main`) | Craft 6 (`craft6`) |
+|-|-|-|
+| PHP | 8.4 | 8.5 (Craft 6 requires it) |
+| `craft/` | Craft's own layout | a Laravel app: `bootstrap/`, `config/` (Laravel) and `config/craft/` (Craft), `resources/views/` (templates), `app/` |
+| Web root | `public/` | `public/`, unchanged (`usePublicPath` in `craft/bootstrap/app.php`) |
+| DDEV | type `craftcms` | type `laravel`; `ddev craft …` still works (`.ddev/commands/web/craft`), as does `ddev artisan …` |
+| `.env` | `CRAFT_DB_*`, `CRAFT_SECURITY_KEY` | Laravel's `DB_*`, `APP_KEY`, `APP_ENV`, `APP_DEBUG` |
+| Vite | `nystudio107/craft-vite` | Laravel's Vite (`laravel-vite-plugin`, Craft's `vite()` Twig function), plus `craft.frontend` helpers for inlined fonts, critical CSS and the async stylesheet. No Craft 6 version of craft-vite exists |
+| Email | `craftcms/postmark` plugin | Laravel's Postmark mailer: `MAIL_MAILER=postmark` and `POSTMARK_API_KEY` in production; Mailpit locally |
+| Expanded Singles | installed | left out: no Craft 6 version yet |
+| Error pages | `_views/<code>` (`errorTemplatePrefix`) | Craft 6 looks in `errors/`; `errors/error.twig` includes `_views/error` |
+| `general.php` | `GeneralConfig::create()->…` | an array: Laravel loads it before Craft boots, and some setters need Craft running |
+| `defaultCpLanguage` | `en-GB` | left out: on beta.1 it loops until PHP runs out of memory. Add it back when fixed |
+
+The `frontend` module and its `frontend/setup/*` commands run through
+`craftcms/yii2-adapter`, unchanged apart from the Vite helpers.
+
+To bring a Craft 6 change into the branch, or a fix from `main` into it: `git switch craft6`,
+merge or edit, `bin/smoke` (it builds whatever branch is checked out), commit.
+
 ## Remove a site
 
 ```bash

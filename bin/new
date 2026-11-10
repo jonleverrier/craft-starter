@@ -3,8 +3,9 @@
 # Makes a new site beside the starter, in a folder named after its domain:
 #
 #   cd ~/Sites/starter
-#   bin/new myidea.local        →  ~/Sites/myidea.local
-#   bin/new                     (asks for the domain)
+#   bin/new myidea.local            →  ~/Sites/myidea.local  (Craft 5, from main)
+#   bin/new --craft6 myidea.local   →  the same, on Craft 6 (beta), from the craft6 branch
+#   bin/new                         (asks for the domain)
 #
 # Copier then asks the remaining questions and runs the setup. Anything after the
 # domain goes to copier as-is. SITES_DIR=/elsewhere overrides the parent folder.
@@ -18,6 +19,16 @@ SITES_DIR="${SITES_DIR:-$(dirname "$STARTER")}"
 export PATH="$PATH:$HOME/Library/Python/3.9/bin"
 command -v copier >/dev/null || { echo "Copier isn't installed: python3 -m pip install --user copier" >&2; exit 1; }
 
+# HEAD: the starter's latest commit, on whichever branch is checked out. --craft6 always
+# builds from the craft6 branch's latest commit, so it works from a main checkout too.
+ref=HEAD
+if [ "${1:-}" = "--craft6" ]; then
+    ref=craft6
+    shift
+    git -C "$STARTER" rev-parse --verify -q craft6 >/dev/null \
+        || { echo "The starter has no craft6 branch" >&2; exit 1; }
+fi
+
 domain="${1:-}"
 if [ -n "$domain" ]; then
     shift
@@ -29,5 +40,5 @@ fi
 dest="$SITES_DIR/$domain"
 [ ! -e "$dest" ] || { echo "$dest already exists" >&2; exit 1; }
 
-# HEAD: the starter's latest commit. Copier checks the domain before writing anything.
-exec copier copy --trust --vcs-ref HEAD --data "domain=$domain" "$@" "$STARTER" "$dest"
+# Copier checks the domain before writing anything.
+exec copier copy --trust --vcs-ref "$ref" --data "domain=$domain" "$@" "$STARTER" "$dest"

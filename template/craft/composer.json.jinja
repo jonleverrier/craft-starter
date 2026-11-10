@@ -2,39 +2,44 @@
   "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {
+    "php": "^{{ php_version }}",
     "craftcms/ckeditor": "{{ ckeditor_version }}",
     "craftcms/cms": "{{ craft_version }}",
-    "craftcms/postmark": "{{ postmark_version }}",
-    "nystudio107/craft-vite": "{{ vite_plugin_version }}",
-    "verbb/expanded-singles": "{{ expanded_singles_version }}",
-    "vlucas/phpdotenv": "^5.4.0"
+    "craftcms/yii2-adapter": "{{ yii2_adapter_version }}",
+    "laravel/framework": "{{ laravel_version }}",
+    "symfony/http-client": "{{ postmark_mailer_version }}",
+    "symfony/postmark-mailer": "{{ postmark_mailer_version }}"
   },
   "autoload": {
     "psr-4": {
+      "App\\": "app/",
       "modules\\": "modules/"
     }
   },
   "config": {
     "allow-plugins": {
       "craftcms/plugin-installer": true,
+      "php-http/discovery": true,
       "yiisoft/yii2-composer": true
     },
     "sort-packages": true,
     "optimize-autoloader": true,
-    "platform": {
-      "php": "{{ php_version }}"
-    }
+    "preferred-install": "dist"
   },
   "scripts": {
+    "post-autoload-dump": [
+      "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+      "@php artisan package:discover --ansi",
+      "@php artisan craft:setup:publish --ansi"
+    ],
     "post-update-cmd": [
-      "@php craft clear-caches/all --interactive=0",
-      "@php craft migrate/all --interactive=0",
-      "@php craft project-config/apply"
+      "@php craft up --no-interaction"
     ],
     "post-install-cmd": [
-      "@php craft clear-caches/all --interactive=0",
-      "@php craft migrate/all --interactive=0",
-      "@php craft project-config/apply"
+      "@php craft up --no-interaction"
+    ],
+    "pre-package-uninstall": [
+      "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
     ]
   },
   "repositories": [

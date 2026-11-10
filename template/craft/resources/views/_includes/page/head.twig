@@ -1,0 +1,30 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>document.documentElement.classList.remove('no-js');</script>
+
+{# Title: the view's pageTitleParts, else the entry's title (not on the homepage), then the site name. #}
+{% set titleParts = pageTitleParts ?? [] %}
+{% if not titleParts and element and element.uri != '__home__' %}
+    {% set titleParts = [element.title] %}
+{% endif %}
+<title>{{ titleParts|merge([siteName])|join(' | ') }}</title>
+<link rel="canonical" href="{{ element.url ?? siteUrl(craft.app.request.pathInfo) }}">
+<link rel="icon" href="/favicon.ico" sizes="any">
+
+{% if craft.frontend.viteHot() %}
+    {# `npm run dev`: fonts and app straight from the dev server, with hot reload. One call,
+       so Vite's client script is included once. #}
+    {{ vite(['build/scss/fonts.scss', 'build/js/app.js']) }}
+{% else %}
+    {# Every @font-face, inlined on every page and nowhere else (see build/scss/fonts.scss). #}
+    <style>{{ craft.frontend.viteContent('build/scss/fonts.scss') }}</style>
+
+    {# First view of this build: inline the critical CSS and load the stylesheet async.
+       After that the stylesheet is cached, so load it normally. A miss sets the cookie. #}
+    {% if not craft.frontend.hasCriticalCssCookie() %}
+        {{ craft.frontend.criticalCss(tplPath ?? null) }}
+        {{ craft.frontend.viteAsync('build/js/app.js') }}
+    {% else %}
+        {{ vite('build/js/app.js') }}
+    {% endif %}
+{% endif %}

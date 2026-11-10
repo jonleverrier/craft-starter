@@ -1,12 +1,23 @@
 <?php
-/**
- * Craft web bootstrap file
- */
 
-// Load shared bootstrap
-require dirname(__DIR__) . '/craft/bootstrap.php';
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 
-// Load and run Craft
-/** @var craft\web\Application $app */
-$app = require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/web.php';
-$app->run();
+define('LARAVEL_START', microtime(true));
+
+// The Laravel app (Craft) lives in ../craft.
+$craft = dirname(__DIR__) . '/craft';
+
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = $craft . '/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Register the Composer autoloader...
+require $craft . '/vendor/autoload.php';
+
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once $craft . '/bootstrap/app.php';
+
+$app->handleRequest(Request::capture());

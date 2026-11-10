@@ -52,7 +52,7 @@ render_only() {
 
     ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$out/.ddev/config.yaml" || fail ".ddev/config.yaml is not valid YAML"
     grep -q "^name: $DOMAIN$" "$out/.ddev/config.yaml" || fail "ddev name not set"
-    grep -q 'php_version: "8.4"' "$out/.ddev/config.yaml" || fail "php_version not set"
+    grep -q 'php_version: "8.5"' "$out/.ddev/config.yaml" || fail "php_version not set"
     for j in package.json craft/composer.json; do
         [ -f "$out/$j" ] || continue
         node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$out/$j" || fail "$j is not valid JSON"
@@ -84,7 +84,7 @@ render_only_extra() {
     local php_files
     php_files="$(cd "$out" && find craft public -name '*.php' -not -path '*/vendor/*' 2>/dev/null | sort || true)"
     [ -n "$php_files" ] || fail "no PHP files rendered"
-    docker run --rm -v "$out:/app" -w /app php:8.4-cli \
+    docker run --rm -v "$out:/app" -w /app php:8.5-cli \
         sh -c 'for f in "$@"; do php -l "$f" >/dev/null || exit 1; done' _ $php_files \
         || fail "PHP syntax error"
     ok "PHP lints"
@@ -101,10 +101,10 @@ render_only_extra() {
     for t in _layouts/page _includes/page/head _includes/page/header _includes/page/footer \
              _includes/page/scripts _routers/single _routers/channel _routers/structure \
              _routers/entry _views/single/home/default _views/error; do
-        [ -f "$out/craft/templates/$t.twig" ] || fail "missing template $t.twig"
+        [ -f "$out/craft/resources/views/$t.twig" ] || fail "missing template $t.twig"
     done
     # Twig must arrive untouched: Copier only renders .jinja files.
-    grep -q '{{ head() }}' "$out/craft/templates/_layouts/page.twig" || fail "Twig was rendered by Copier"
+    grep -q '{{ head() }}' "$out/craft/resources/views/_layouts/page.twig" || fail "Twig was rendered by Copier"
     ok "templates present and untouched"
 
     # Build the CSS and JS without DDEV (critical CSS skipped: it needs a running site).
@@ -192,7 +192,8 @@ full() {
     page="$(get "$url/")"
     grep -qF '<title>Smoke &quot;Test&quot; Jon&#039;s $hop</title>' <<<"$page" \
         || fail "home <title> doesn't carry the site name: $(grep -o '<title>.*</title>' <<<"$page")"
-    ok "home page renders with the site name"
+    grep -qF '<h1>Home</h1>' <<<"$page" || fail "home <h1> isn't the Home entry's title: $(grep -o '<h1>.*</h1>' <<<"$page")"
+    ok "home page renders with the site name and the Home entry"
 
     code="$(get -o /dev/null -w '%{http_code}' "$url/manager")"
     [[ "$code" =~ ^(200|302)$ ]] || fail "/manager returned $code"
@@ -213,11 +214,11 @@ full() {
     [ "$magic" = "ftypavif" ] || fail "AVIF encode produced: $magic"
     ok "AVIF encodes for real"
 
-    grep -rqF '$PRIMARY_SITE_URL' craft/config/project/ || fail "project config doesn't use \$PRIMARY_SITE_URL"
-    grep -rqF '$PRIMARY_SITE_NAME' craft/config/project/ || fail "project config doesn't use \$PRIMARY_SITE_NAME"
-    grep -rq "handle: home" craft/config/project/sections/ || fail "no Home section in project config"
-    grep -qF '$PRIMARY_SITE_FILESYSTEM_WEBROOT' craft/config/project/project.yaml || fail "no Local filesystem in project config"
-    grep -rq "handle: local" craft/config/project/volumes/ || fail "no Local volume in project config"
+    grep -rqF '$PRIMARY_SITE_URL' craft/config/craft/project/ || fail "project config doesn't use \$PRIMARY_SITE_URL"
+    grep -rqF '$PRIMARY_SITE_NAME' craft/config/craft/project/ || fail "project config doesn't use \$PRIMARY_SITE_NAME"
+    grep -rq "handle: home" craft/config/craft/project/sections/ || fail "no Home section in project config"
+    grep -qF '$PRIMARY_SITE_FILESYSTEM_WEBROOT' craft/config/craft/project/project.yaml || fail "no Local filesystem in project config"
+    grep -rq "handle: local" craft/config/craft/project/volumes/ || fail "no Local volume in project config"
     ok "project config is env-driven and has Home and the Local volume"
 
     [ "$(git rev-list --count HEAD)" = 1 ] || fail "expected exactly one commit"

@@ -20,9 +20,9 @@ ddev export-db --gzip=true --file="$LOCAL_BACKUP" >/dev/null
 say "saved $(basename "$LOCAL_BACKUP") ($(du -h "$LOCAL_BACKUP" | cut -f1))"
 
 step "2/3  Dumping production"
-DB="$(remote_env CRAFT_DB_DATABASE)"
-DU="$(remote_env CRAFT_DB_USER)"
-DP="$(remote_env CRAFT_DB_PASSWORD)"
+DB="$(remote_env DB_DATABASE)"
+DU="$(remote_env DB_USERNAME)"
+DP="$(remote_env DB_PASSWORD)"
 [ -n "$DB" ] && [ -n "$DU" ] && [ -n "$DP" ] || die "couldn't read DB credentials from $REMOTE_ENV"
 say "database: $DB"
 
@@ -39,7 +39,7 @@ say "saved $(basename "$PROD_DUMP") ($(du -h "$PROD_DUMP" | cut -f1))"
 
 step "3/3  Importing into ddev"
 ddev import-db --file="$PROD_DUMP" >/dev/null
-ddev exec "rm -rf craft/storage/runtime/cache/*" >/dev/null 2>&1 || true
+ddev exec "rm -rf craft/storage/runtime/cache/* craft/storage/framework/cache/data/*" >/dev/null 2>&1 || true
 
 TABLES=$(ddev mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()" 2>/dev/null | tr -d ' ')
 ENTRIES=$(ddev mysql -N -e "SELECT COUNT(*) FROM entries" 2>/dev/null | tr -d ' ')

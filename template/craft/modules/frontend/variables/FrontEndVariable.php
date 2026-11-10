@@ -3,10 +3,16 @@
 namespace modules\frontend\variables;
 
 use Craft;
-use nystudio107\vite\Vite;
+use Illuminate\Foundation\Vite;
+use Illuminate\Support\Facades\Cache;
+use Twig\Markup;
 
 /**
  * Template helpers exposed as `craft.frontend`.
+ *
+ * The Vite helpers sit on Laravel's Vite (the same one behind Craft 6's `vite()` Twig
+ * function), adding what nystudio107/craft-vite used to: inlined CSS, critical CSS and a
+ * non-blocking stylesheet.
  */
 class FrontEndVariable
 {
@@ -16,6 +22,10 @@ class FrontEndVariable
     /** Roughly three months. */
     private const CRITICAL_COOKIE_LIFETIME = 7890000;
 
+    /** Where rollup-plugin-critical writes (criticalBase in vite.config.js), and its file suffix. */
+    private const CRITICAL_DIR = 'dist/criticalcss';
+    private const CRITICAL_SUFFIX = '_critical.min.css';
+
     /** A month: AVIF support is a property of the host. */
     private const AVIF_TTL = 2592000;
 
@@ -23,26 +33,86 @@ class FrontEndVariable
     private const AVIF_QUALITY = 72;
 
     /**
+     * Is `npm run dev` running? (laravel-vite-plugin writes public/hot while it is.)
+     */
+    public function viteHot(): bool
+    {
+        return $this->vite()->isRunningHot();
+    }
+
+    /**
+     * A built entry's contents, for inlining — e.g. the @font-face rules in fonts.scss.
+     */
+    public function viteContent(string $entry): Markup
+    {
+        try {
+            $css = $this->vite()->content($entry);
+        } catch (\Throwable $e) {
+            // Nothing built yet: the page still renders, just without the inlined CSS.
+            Craft::warning("Vite content unavailable for $entry: " . $e->getMessage(), __METHOD__);
+            $css = '';
+        }
+
+        return new Markup($css, 'UTF-8');
+    }
+
+    /**
+     * An entry's tags with its stylesheets loaded without blocking render: they apply
+     * once downloaded, while the inlined critical CSS paints the first view.
+     */
+    public function viteAsync(string|array $entries): Markup
+    {
+        // A copy, so the shared Vite instance (and the plain `vite()` tags) keep blocking CSS.
+        $vite = clone $this->vite();
+        $vite->useStyleTagAttributes(fn () => [
+            'media' => 'print',
+            'onload' => "this.media='all'",
+        ]);
+
+        return new Markup((string) $vite($entries), 'UTF-8');
+    }
+
+    /**
+     * The critical CSS for a template, inlined. `template` is the view's path, with or
+     * without .twig — the name rollup-plugin-critical wrote it under (CRITICAL_PAGES).
+     */
+    public function criticalCss(?string $template): Markup
+    {
+        if (!$template || $this->viteHot()) {
+            return new Markup('', 'UTF-8');
+        }
+
+        $name = preg_replace('/\.twig$/', '', ltrim($template, '/'));
+        $file = public_path(self::CRITICAL_DIR . '/' . $name . self::CRITICAL_SUFFIX);
+
+        if (!is_file($file)) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup('<style>' . file_get_contents($file) . '</style>', 'UTF-8');
+    }
+
+    /**
      * Has this visitor already been served the current build's critical CSS?
      *
      * A miss also SETS the cookie, so the next page load is a hit. The cookie holds the
-     * CSS hash, so a new build invalidates it on its own.
+     * build's manifest hash, so a new build invalidates it on its own.
      */
     public function hasCriticalCssCookie(): bool
     {
-        // Empty if the plugin is missing or nothing is built: then critical CSS is always inlined.
-        $hash = Vite::$plugin?->helper->getCssHash('build/js/app.js') ?? '';
+        // Empty when nothing is built: then critical CSS is always inlined.
+        $hash = (string) ($this->vite()->manifestHash() ?? '');
 
         if (($_COOKIE[self::CRITICAL_COOKIE] ?? null) === $hash) {
             return true;
         }
 
-        // Raw, not through Craft's signed cookies, so JS or an edge cache can read it.
+        // Raw, not through Laravel's encrypted cookies, so JS or an edge cache can read it.
         setcookie(self::CRITICAL_COOKIE, $hash, [
             'expires' => time() + self::CRITICAL_COOKIE_LIFETIME,
             'path' => '/',
             // Secure cookies are dropped on plain http.
-            'secure' => Craft::$app->getRequest()->getIsSecureConnection(),
+            'secure' => request()->isSecure(),
             'samesite' => 'Lax',
         ]);
 
@@ -55,7 +125,7 @@ class FrontEndVariable
      */
     public function supportsAvif(): bool
     {
-        return (bool) Craft::$app->getCache()->getOrSet('supportsAvif', static function (): bool {
+        return (bool) Cache::remember('supportsAvif', self::AVIF_TTL, static function (): bool {
             if (!Craft::$app->getImages()->getIsImagick()) {
                 return function_exists('imageavif');
             }
@@ -73,7 +143,7 @@ class FrontEndVariable
 
                 return false;
             }
-        }, self::AVIF_TTL);
+        });
     }
 
     /**
@@ -82,5 +152,10 @@ class FrontEndVariable
     public function avifQuality(): int
     {
         return self::AVIF_QUALITY;
+    }
+
+    private function vite(): Vite
+    {
+        return app(Vite::class);
     }
 }

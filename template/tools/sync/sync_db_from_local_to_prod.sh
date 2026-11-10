@@ -22,23 +22,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 require_ddev
 require_ssh
 
-DB="$(remote_env CRAFT_DB_DATABASE)"
-DU="$(remote_env CRAFT_DB_USER)"
-DP="$(remote_env CRAFT_DB_PASSWORD)"
+DB="$(remote_env DB_DATABASE)"
+DU="$(remote_env DB_USERNAME)"
+DP="$(remote_env DB_PASSWORD)"
 [ -n "$DB" ] && [ -n "$DU" ] && [ -n "$DP" ] || die "couldn't read DB credentials from $REMOTE_ENV"
 
 # The security key encrypts stored values. Push a database whose contents were
 # encrypted under a different key and production keeps running while quietly
 # failing to read anything sensitive — so it is checked BEFORE the confirmation,
 # by comparing hashes rather than moving either key around.
-LOCAL_KEY_HASH="$(printf '%s' "$(envval CRAFT_SECURITY_KEY)" | shasum -a 256 | cut -c1-16)"
+LOCAL_KEY_HASH="$(printf '%s' "$(envval APP_KEY)" | shasum -a 256 | cut -c1-16)"
 # tr -d '\n' before hashing, on BOTH sides. sed and head each emit a trailing
 # newline and sha256sum hashes it, so without this the remote digest covers
 # "key\n" while the local one covers "key" — they never match, and the guard
 # blocks every push including the correct ones.
-PROD_KEY_HASH="$(sshx "sed -n 's/^CRAFT_SECURITY_KEY=//p' '$REMOTE_ENV' | head -1 | tr -d '\"' | tr -d '\r' | tr -d '\n' | sha256sum | cut -c1-16")"
+PROD_KEY_HASH="$(sshx "sed -n 's/^APP_KEY=//p' '$REMOTE_ENV' | head -1 | tr -d '\"' | tr -d '\r' | tr -d '\n' | sha256sum | cut -c1-16")"
 [ "$LOCAL_KEY_HASH" = "$PROD_KEY_HASH" ] \
-    || die "CRAFT_SECURITY_KEY differs between local and production.
+    || die "APP_KEY differs between local and production.
          Pushing would leave every encrypted value unreadable.
          local $LOCAL_KEY_HASH / prod $PROD_KEY_HASH"
 
@@ -66,7 +66,7 @@ say "imported"
 step "4/4  Migrations, project config, caches"
 # compiled_classes first: a changed controller route 404s until it is cleared.
 sshx "rm -rf '$SSH_PATH/shared/storage/runtime/compiled_classes' \
-      && cd '$SSH_PATH/current/craft' && ./craft up --interactive=0" 2>&1 | tail -4 | sed 's/^/  /'
+      && cd '$SSH_PATH/current/craft' && ./craft up --no-interaction" 2>&1 | tail -4 | sed 's/^/  /'
 
 step "Done."
 say "rollback: gunzip -c $PROD_BACKUP | ssh $REMOTE \"MYSQL_PWD=... mysql -h 127.0.0.1 -u $DU $DB\""

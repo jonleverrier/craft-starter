@@ -1,6 +1,10 @@
 name: {{ domain }}
-type: craftcms
+type: laravel
 docroot: public
+# Uploaded assets (relative to docroot), kept out of Mutagen's sync. Type craftcms set
+# this itself; type laravel doesn't.
+upload_dirs:
+    - assets
 php_version: "{{ php_version }}"
 webserver_type: nginx-fpm
 xdebug_enabled: false

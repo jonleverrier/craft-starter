@@ -5,8 +5,10 @@ namespace modules\frontend\console\controllers;
 use Craft;
 use craft\console\Controller;
 use craft\elements\Asset;
+use craft\elements\Entry;
 use craft\fieldlayoutelements\assets\AltField;
 use craft\fieldlayoutelements\assets\AssetTitleField;
+use craft\fieldlayoutelements\entries\EntryTitleField;
 use craft\fs\Local;
 use craft\models\EntryType;
 use craft\models\FieldLayout;
@@ -30,6 +32,7 @@ class SetupController extends Controller
         $entries = Craft::$app->getEntries();
 
         if ($entries->getSectionByHandle('home')) {
+            $this->titleHome();
             $this->stdout("Home already exists.\n");
             return ExitCode::OK;
         }
@@ -38,6 +41,21 @@ class SetupController extends Controller
             'name' => 'Home',
             'handle' => 'home',
         ]);
+
+        if (!$entryType->id) {
+            // Craft 6 only gives an entry type a title field when its layout has one.
+            $entryType->setFieldLayout(FieldLayout::createFromConfig([
+                'type' => Entry::class,
+                'tabs' => [
+                    [
+                        'name' => 'Content',
+                        'elements' => [
+                            ['type' => EntryTitleField::class],
+                        ],
+                    ],
+                ],
+            ]));
+        }
 
         if (!$entryType->id && !$entries->saveEntryType($entryType)) {
             $this->stderr('Could not save the Home entry type: ' . json_encode($entryType->getErrors()) . "\n");
@@ -65,8 +83,23 @@ class SetupController extends Controller
             return ExitCode::UNSPECIFIED_ERROR;
         }
 
+        $this->titleHome();
+
         $this->stdout("Home created.\n");
         return ExitCode::OK;
+    }
+
+    /**
+     * Craft 5 titled a new single after its section; Craft 6 (beta) leaves it blank.
+     */
+    private function titleHome(): void
+    {
+        $home = Entry::find()->section('home')->status(null)->one();
+
+        if ($home && !$home->title) {
+            $home->title = 'Home';
+            Craft::$app->getElements()->saveElement($home);
+        }
     }
 
     /**

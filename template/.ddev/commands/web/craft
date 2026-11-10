@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+## Description: Run Craft's CLI (craft/craft) inside the web container
+## Usage: craft [flags] [args]
+## Example: "ddev craft up" or "ddev craft frontend/setup/home"
+## ExecRaw: true
+## MutagenSync: true
+
+# DDEV's own `craft` command is for the craftcms project type only; Craft 6 runs as type
+# laravel (`ddev artisan` also works), so this one brings `ddev craft` back.
+cd "${DDEV_COMPOSER_ROOT:-/var/www/html}" || exit 1
+php ./craft "$@"

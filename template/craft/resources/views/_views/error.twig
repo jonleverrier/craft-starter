@@ -1,6 +1,6 @@
 {#
-  Every error page. Craft looks for _views/<status code>, then _views/error
-  (errorTemplatePrefix in config/general.php).
+  Every error page. Craft 6 looks for errors/<status code>, then errors/error, which
+  includes this view.
 #}
 {% extends '_layouts/page.twig' %}
 

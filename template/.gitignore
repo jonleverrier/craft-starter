@@ -2,16 +2,18 @@
 /.idea
 node_modules
 
-# Craft
+# Craft (Laravel keeps its own .gitignore in each storage/ and bootstrap/cache/ folder)
 /craft/vendor
 /craft/.env
-/craft/storage/*
-!/craft/storage/.gitkeep
+/craft/storage/*.key
 
 # Built and generated — Vite and Craft rebuild these
 /public/dist/*
 /public/cpresources/*
 !/public/cpresources/.gitkeep
+/public/hot
+/public/storage
+/public/vendor/craft
 /build/scss/templates/_sprite.scss
 
 # Uploaded assets are content, not code

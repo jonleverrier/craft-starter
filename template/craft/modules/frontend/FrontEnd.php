@@ -43,6 +43,6 @@ class FrontEnd extends BaseModule
     private function attachEventHandlers(): void
     {
         // Register event handlers here.
-        // https://craftcms.com/docs/5.x/extend/events.html
+        // https://craftcms.com/docs/6.x/extend/events.html
     }
 }

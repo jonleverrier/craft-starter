@@ -8,8 +8,8 @@ _answers_file: .copier-answers.yml
 
 # Owned by the project from the moment it's created; `copier update` never touches them.
 _skip_if_exists:
-    - craft/config/project/**
-    - craft/templates/_views/single/home/default.twig
+    - craft/config/craft/project/**
+    - craft/resources/views/_views/single/home/default.twig
     - build/scss/theme/_setup.scss
 
 # `|| true`: Copier deletes the new folder when a task fails, which would take the
@@ -50,7 +50,7 @@ admin_username:
 
 php_version:
     type: str
-    default: "8.4"
+    default: "8.5"
     when: false
 mysql_version:
     type: str
@@ -66,21 +66,23 @@ composer_version:
     when: false
 craft_version:
     type: str
-    default: "^5.11"
+    default: "^6.0.0-beta.1"
     when: false
-vite_plugin_version:
+# Keeps Yii-era code (the frontend module, plugins not yet ported) running on Craft 6.
+yii2_adapter_version:
     type: str
-    default: "^5.0"
+    default: "^6.0.0-beta.1"
+    when: false
+laravel_version:
+    type: str
+    default: "^13.17"
     when: false
 ckeditor_version:
     type: str
-    default: "^5.7"
+    default: "^6.0.0-beta.1"
     when: false
-postmark_version:
+# Laravel's Postmark mailer (replaces the craftcms/postmark plugin).
+postmark_mailer_version:
     type: str
-    default: "^3.1"
-    when: false
-expanded_singles_version:
-    type: str
-    default: "^3.0"
+    default: "^7.4 || ^8.0"
     when: false

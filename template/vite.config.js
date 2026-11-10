@@ -6,6 +6,7 @@ import viteCompression from 'vite-plugin-compression';
 import terser from '@rollup/plugin-terser';
 import VitePluginSvgSpritemap from '@spiriit/vite-plugin-svg-spritemap';
 import critical from 'rollup-plugin-critical';
+import laravel from 'laravel-vite-plugin';
 
 // Critical CSS: one LIVE url per view template. `template` must be the view's path
 // without .twig — Craft looks the file up by it. A url that 404s captures the 404 page.
@@ -22,7 +23,7 @@ function criticalCoverage(pages) {
     return {
         name: 'critical-coverage',
         buildStart() {
-            const root = path.resolve(__dirname, 'craft/templates');
+            const root = path.resolve(__dirname, 'craft/resources/views');
             const walk = (dir) => fs.readdirSync(dir, {withFileTypes: true}).flatMap((d) =>
                 d.isDirectory() ? walk(path.join(dir, d.name)) : d.name.endsWith('.twig') ? [path.join(dir, d.name)] : []);
             const covered = new Set(pages.map((p) => p.template));
@@ -37,24 +38,18 @@ function criticalCoverage(pages) {
 }
 
 // https://vitejs.dev/config/
+// laravel-vite-plugin sets base, outDir (public/dist) and the manifest, and writes
+// public/hot while the dev server runs, which is how Craft knows to use it.
 export default defineConfig(({command}) => ({
-    base: command === 'serve' ? '' : '/dist/',
     publicDir: path.resolve(__dirname, './build/static'),
     build: {
         emptyOutDir: true,
-        manifest: 'manifest.json',
-        outDir: path.resolve('./public/dist'),
         sourcemap: false,
         assetsInlineLimit: 0,
         rollupOptions: {
-            input: {
-                'js/app': './build/js/app.js',
-                // @font-face rules, inlined in every page's head (see build/scss/fonts.scss).
-                'fonts': './build/scss/fonts.scss',
-            },
             output: {
-                entryFileNames: '[name].[hash].js',
-                chunkFileNames: '[name].[hash].js',
+                entryFileNames: 'js/[name].[hash].js',
+                chunkFileNames: 'js/[name].[hash].js',
                 assetFileNames: ({name}) => {
                     if (/\.(gif|jpe?g|png|svg|webp|ico)$/.test(name ?? '')) {
                         return 'img/[name].[hash][extname]';
@@ -80,6 +75,16 @@ export default defineConfig(({command}) => ({
         },
     },
     plugins: [
+        laravel({
+            input: [
+                'build/js/app.js',
+                // @font-face rules, inlined in every page's head (see build/scss/fonts.scss).
+                'build/scss/fonts.scss',
+            ],
+            buildDirectory: 'dist',
+            // Reload the page when a template changes.
+            refresh: ['craft/resources/views/**'],
+        }),
         criticalCoverage(CRITICAL_PAGES),
         VitePluginSvgSpritemap('./build/icons/*.svg', {
             output: {
@@ -122,7 +127,7 @@ export default defineConfig(({command}) => ({
                     {width: 1280, height: 900},
                     {width: 1728, height: 1000},
                 ],
-                // Write .css files; Craft inlines them itself (craft.vite.includeCriticalCssTags).
+                // Write .css files; Craft inlines them itself (craft.frontend.criticalCss).
                 inline: false,
                 extract: false,
                 // @font-face lives in fonts.scss, inlined separately. Never twice.
@@ -135,12 +140,10 @@ export default defineConfig(({command}) => ({
         })]),
         ViteRestart({
             reload: [
-                'craft/templates/**/*',
                 'build/icons/**/*',
             ],
             restart: [
                 'vite.config.js',
-                'craft/config/vite.php',
             ]
         }),
     ],

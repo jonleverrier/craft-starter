@@ -14,7 +14,9 @@ DOMAIN='{{ domain | replace("'", "'\\''") }}'
 ADMIN_EMAIL='{{ admin_email | replace("'", "'\\''") }}'
 ADMIN_USERNAME='{{ admin_username | replace("'", "'\\''") }}'
 STARTER_VERSION='{{ _commit | default("dev") }}'
-PLUGINS=(vite ckeditor postmark expanded-singles)
+# Craft 6 beta: only plugins with a Craft 6 release. craft-vite is replaced by Laravel's
+# Vite, postmark by Laravel's Postmark mailer; expanded-singles has no Craft 6 version yet.
+PLUGINS=(ckeditor)
 
 FROM=1
 for arg in "$@"; do
@@ -71,10 +73,11 @@ if due 2; then
         echo "  exists, leaving it alone"
     else
         cp craft/.env.example craft/.env
-        KEY="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+        # Laravel's APP_KEY (what `artisan key:generate` writes) replaces CRAFT_SECURITY_KEY.
+        KEY="base64:$(openssl rand -base64 32)"
         APP_ID="CraftCMS--$(uuidgen | tr '[:upper:]' '[:lower:]')"
         sed -i '' \
-            -e "s|^CRAFT_SECURITY_KEY=.*|CRAFT_SECURITY_KEY=$KEY|" \
+            -e "s|^APP_KEY=.*|APP_KEY=$KEY|" \
             -e "s|^CRAFT_APP_ID=.*|CRAFT_APP_ID=$APP_ID|" \
             craft/.env
         echo "  ok"
@@ -90,24 +93,27 @@ fi
 # --- 4. Composer ----------------------------------------------------------------
 if due 4; then
     step 4 "Installing PHP packages"
-    # No scripts: they run Craft commands, and Craft isn't installed yet.
+    # No scripts: post-install runs `craft up`, and Craft isn't installed yet. The
+    # autoload ones (package discovery, publishing Craft's files) run next, by hand.
     ddev composer install --no-scripts --no-interaction
+    ddev composer dump-autoload
 fi
 
 # --- 5. Craft --------------------------------------------------------------------
 if due 5; then
     step 5 "Installing Craft"
-    if ddev craft install/check >/dev/null 2>&1; then
+    if ddev craft install:check >/dev/null 2>&1; then
         echo "  already installed"
     else
         # Literal $VARs: Craft stores the env var names, so the URL and name stay in .env.
-        ddev craft install --interactive=0 \
+        ddev craft install --no-interaction \
             --email="$ADMIN_EMAIL" \
             --username="$ADMIN_USERNAME" \
             --password="$ADMIN_PASSWORD" \
-            --site-name='$PRIMARY_SITE_NAME' \
-            --site-url='$PRIMARY_SITE_URL' \
-            --language=en-GB
+            --siteName='$PRIMARY_SITE_NAME' \
+            --siteUrl='$PRIMARY_SITE_URL' \
+            --language=en-GB \
+            --timezone=UTC
     fi
     ddev craft frontend/setup/home
     ddev craft frontend/setup/assets
@@ -117,7 +123,7 @@ fi
 if due 6; then
     step 6 "Installing plugins"
     for handle in "${PLUGINS[@]}"; do
-        ddev craft plugin/install "$handle" --interactive=0
+        ddev craft plugin:install "$handle" --no-interaction
     done
 fi
 
@@ -150,6 +156,6 @@ cat <<DONE
   CP:       https://$DOMAIN/manager  ($ADMIN_USERNAME)
   Dev:      ddev npm run dev
   Build:    ddev npm run build
-  Update:   copier update   (with a clean git tree)
+  Update:   copier update --trust --vcs-ref=craft6   (with a clean git tree)
 
 DONE

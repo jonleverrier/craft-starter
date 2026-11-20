@@ -2,10 +2,10 @@
 
 namespace modules\frontend\services;
 
-use craft\base\Image;
-use craft\image\Raster;
-use craft\services\Images as BaseImages;
-use Imagine\Imagick\Image as ImagickImage;
+use CraftCms\Cms\Image\Image;
+use CraftCms\Cms\Image\Images as BaseImages;
+use CraftCms\Cms\Image\Raster;
+use Imagick;
 
 /**
  * Craft's image service, plus two AVIF encoder options Craft doesn't expose.
@@ -22,18 +22,14 @@ class Images extends BaseImages
     /** aom effort, 0 (slowest, smallest) to 10. 5 is a good trade; a transform is encoded once. */
     public const AVIF_SPEED = '5';
 
-    /**
-     * @inheritdoc
-     */
     public function loadImage(string $path, bool $rasterize = false, int $svgSize = 1000): Image
     {
         $image = parent::loadImage($path, $rasterize, $svgSize);
 
         if ($image instanceof Raster) {
-            $imagineImage = $image->getImagineImage();
+            $imagick = $image->getInterventionImage()?->core()->native();
 
-            if ($imagineImage instanceof ImagickImage) {
-                $imagick = $imagineImage->getImagick();
+            if ($imagick instanceof Imagick) {
                 $imagick->setOption('heic:chroma', self::AVIF_CHROMA);
                 $imagick->setOption('heic:speed', self::AVIF_SPEED);
             }

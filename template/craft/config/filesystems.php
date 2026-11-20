@@ -47,6 +47,20 @@ return [
             'report' => false,
         ],
 
+        // The Local asset volume: public/assets, served at /assets.
+        'assets' => [
+            'driver' => 'local',
+            'root' => env('PRIMARY_SITE_FILESYSTEM_WEBROOT'),
+            'url' => rtrim((string) env('PRIMARY_SITE_FILESYSTEM_URL'), '/'),
+            'visibility' => 'public',
+            'permissions' => [
+                'file' => ['public' => 0644, 'private' => 0600],
+                'dir' => ['public' => 0775, 'private' => 0700],
+            ],
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

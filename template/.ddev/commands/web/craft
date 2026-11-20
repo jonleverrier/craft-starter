@@ -2,7 +2,7 @@
 
 ## Description: Run Craft's CLI (craft/craft) inside the web container
 ## Usage: craft [flags] [args]
-## Example: "ddev craft up" or "ddev craft frontend/setup/home"
+## Example: "ddev craft up" or "ddev craft frontend:setup:home"
 ## ExecRaw: true
 ## MutagenSync: true
 

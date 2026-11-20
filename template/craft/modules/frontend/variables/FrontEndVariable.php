@@ -2,9 +2,10 @@
 
 namespace modules\frontend\variables;
 
-use Craft;
+use CraftCms\Cms\Image\Images;
 use Illuminate\Foundation\Vite;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Twig\Markup;
 
 /**
@@ -49,7 +50,7 @@ class FrontEndVariable
             $css = $this->vite()->content($entry);
         } catch (\Throwable $e) {
             // Nothing built yet: the page still renders, just without the inlined CSS.
-            Craft::warning("Vite content unavailable for $entry: " . $e->getMessage(), __METHOD__);
+            Log::warning("Vite content unavailable for $entry: " . $e->getMessage());
             $css = '';
         }
 
@@ -126,7 +127,7 @@ class FrontEndVariable
     public function supportsAvif(): bool
     {
         return (bool) Cache::remember('supportsAvif', self::AVIF_TTL, static function (): bool {
-            if (!Craft::$app->getImages()->getIsImagick()) {
+            if (!app(Images::class)->getIsImagick()) {
                 return function_exists('imageavif');
             }
 
@@ -139,7 +140,7 @@ class FrontEndVariable
 
                 return $blob !== '';
             } catch (\Throwable $e) {
-                Craft::info('AVIF encoding unavailable: ' . $e->getMessage(), __METHOD__);
+                Log::info('AVIF encoding unavailable: ' . $e->getMessage());
 
                 return false;
             }

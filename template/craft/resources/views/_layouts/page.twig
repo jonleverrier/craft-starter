@@ -1,6 +1,6 @@
 {% set element = entry ?? category ?? element ?? null %}
 <!DOCTYPE html>
-<html lang="{{ craft.app.language|slice(0,2) }}" class="no-js is-loading">
+<html lang="{{ app().getLocale()|slice(0,2) }}" class="no-js is-loading">
 <head>
     {% include '_includes/page/head.twig' %}
     {% block siteHead %}{% endblock %}

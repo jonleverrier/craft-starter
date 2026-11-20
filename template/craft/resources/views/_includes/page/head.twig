@@ -8,7 +8,7 @@
     {% set titleParts = [element.title] %}
 {% endif %}
 <title>{{ titleParts|merge([siteName])|join(' | ') }}</title>
-<link rel="canonical" href="{{ element.url ?? siteUrl(craft.app.request.pathInfo) }}">
+<link rel="canonical" href="{{ element.url ?? siteUrl(app('request').decodedPath()|trim('/')) }}">
 <link rel="icon" href="/favicon.ico" sizes="any">
 
 {% if craft.frontend.viteHot() %}

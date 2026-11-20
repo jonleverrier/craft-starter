@@ -217,8 +217,10 @@ full() {
     grep -rqF '$PRIMARY_SITE_URL' craft/config/craft/project/ || fail "project config doesn't use \$PRIMARY_SITE_URL"
     grep -rqF '$PRIMARY_SITE_NAME' craft/config/craft/project/ || fail "project config doesn't use \$PRIMARY_SITE_NAME"
     grep -rq "handle: home" craft/config/craft/project/sections/ || fail "no Home section in project config"
-    grep -qF '$PRIMARY_SITE_FILESYSTEM_WEBROOT' craft/config/craft/project/project.yaml || fail "no Local filesystem in project config"
+    ! grep -q '^fs:' craft/config/craft/project/project.yaml || fail "project config still defines a Craft filesystem"
     grep -rq "handle: local" craft/config/craft/project/volumes/ || fail "no Local volume in project config"
+    grep -rq "^fs: assets$" craft/config/craft/project/volumes/ || fail "the Local volume isn't on the assets disk"
+    grep -rq "^hasUrls: true$" craft/config/craft/project/volumes/ || fail "the Local volume has no public URLs"
     ok "project config is env-driven and has Home and the Local volume"
 
     [ "$(git rev-list --count HEAD)" = 1 ] || fail "expected exactly one commit"

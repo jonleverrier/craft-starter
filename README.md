@@ -77,8 +77,14 @@ What's different on Craft 6 (6.0.0-beta.1), and why:
 | `general.php` | `GeneralConfig::create()->…` | an array: Laravel loads it before Craft boots, and some setters need Craft running |
 | `defaultCpLanguage` | `en-GB` | left out: on beta.1 it loops until PHP runs out of memory. Add it back when fixed |
 
-The `frontend` module and its `frontend/setup/*` commands run through
-`craftcms/yii2-adapter`, unchanged apart from the Vite helpers.
+| `frontend` module | a Yii module, set up in `config/app.php` | a Laravel service provider (`modules/frontend/FrontEndServiceProvider.php`, listed in `bootstrap/providers.php`); no `config/craft/app.php` |
+| Setup commands | `frontend/setup/home`, `frontend/setup/assets` | artisan commands: `frontend:setup:home`, `frontend:setup:assets` |
+| Asset storage | a Local filesystem in project config | the `assets` disk in `config/filesystems.php` (`public/assets`, served at `/assets`); the Local volume points at it |
+
+Nothing in the starter's own code goes through `craftcms/yii2-adapter`. It's still
+installed for its Yii2 Loose Ends utility (Utilities in the control panel), which lists
+anything a site adds that does. Remove it from `composer.json` once a site no longer
+needs that.
 
 To bring a Craft 6 change into the branch, or a fix from `main` into it: `git switch craft6`,
 merge or edit, `bin/smoke` (it builds whatever branch is checked out), commit.
